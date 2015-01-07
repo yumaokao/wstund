@@ -4,7 +4,7 @@ wstund
 install
 -------
 * pip2
-  .. code:: sh
+  .. code-block:: bash
 
     $ sudo pip2 install python-pytun
 
@@ -22,7 +22,7 @@ install
 run
 ---
 * server
-  .. code:: sh
+  .. code-block:: bash
 
     # run
     $ python2 wstund.py start
@@ -40,7 +40,8 @@ run
     ip=10.10.0.1
 
 * client
-  .. code:: sh
+  .. code-block:: bash
+
     # run
     $ python2 wstund.py start
     # or use -c to select config file
