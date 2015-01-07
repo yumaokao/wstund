@@ -4,6 +4,8 @@ wstund
 install
 -------
 * pip2
+  .. code:: sh
+
     $ sudo pip2 install python-pytun
 
     # wstund
@@ -20,6 +22,8 @@ install
 run
 ---
 * server
+  .. code:: sh
+
     # run
     $ python2 wstund.py start
     # or use -c to select config file
@@ -36,6 +40,7 @@ run
     ip=10.10.0.1
 
 * client
+  .. code:: sh
     # run
     $ python2 wstund.py start
     # or use -c to select config file
@@ -51,5 +56,4 @@ run
     port=80
     ip=10.10.0.2
 
-
-* .. vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
+.. vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
