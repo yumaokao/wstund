@@ -1,0 +1,29 @@
+session_name: wstun
+start_directory: ./ # load session relative to config location (project root).
+
+windows:
+- window_name: gits
+  focus: true
+  panes:
+  - blank
+
+- window_name: server
+  panes:
+  - blank
+
+- window_name: run_server
+  panes:
+  - blank
+
+- window_name: client
+  panes:
+  - blank
+
+- window_name: run_client
+  panes:
+  - blank
+
+- window_name: rivs
+  shell_command_before: cd ~/gits/notes/rivs/
+  panes:
+  - blank
