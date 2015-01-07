@@ -4,7 +4,7 @@ wstund
 install
 -------
 * pip2
-  .. code-block:: bash
+.. code-block:: bash
 
     $ sudo pip2 install python-pytun
 
@@ -19,10 +19,11 @@ install
     # compile all pyc
     $ python2 -m compileall .
 
+
 run
 ---
 * server
-  .. code-block:: bash
+.. code-block:: bash
 
     # run
     $ python2 wstund.py start
@@ -39,8 +40,9 @@ run
     port=80
     ip=10.10.0.1
 
+
 * client
-  .. code-block:: bash
+.. code-block:: bash
 
     # run
     $ python2 wstund.py start
@@ -56,5 +58,6 @@ run
     host=wstund.domain.com
     port=80
     ip=10.10.0.2
+
 
 .. vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
