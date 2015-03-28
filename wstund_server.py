@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 import config as g
 import os
+import sys
 import random
 import select
 import logging
 import cherrypy
 from time import sleep
-from daemon import runner
+from lockfile import LockTimeout
+from daemon.runner import DaemonRunner, DaemonRunnerStopFailureError
 from threading import Thread
 from pytun import TunTapDevice, IFF_TUN, IFF_NO_PI
 from ws4py import configure_logger
@@ -54,7 +56,7 @@ class TunWebSocketHandler(WebSocket):
             tun.addr = g.config.get('server', 'ip')
             # tun.dstaddr = '10.10.0.2'
             tun.netmask = g.config.get('server', 'netmask')
-            tun.mtu = 1500
+            tun.mtu = int(g.config.get('server', 'mtu'))
             tun.up()
             TunWebSocketHandler.tun = tun
 
@@ -69,7 +71,10 @@ class TunWebSocketHandler(WebSocket):
         # cherrypy.log("YMK in received_message: bin {0} len {1} self {2}".format(m.is_binary, len(m), repr(self)))
         cherrypy.log("YMK in received_message: bin {0} len {1}".format(m.is_binary, len(m)))
         if m is not None:
-            self.tun.write(m.data)
+            if m.is_binary:
+                self.tun.write(m.data)
+            else:
+                cherrypy.log("YMK in received_message: {0}".format(m))
 
         # self.send(str(pongip), True)
         # cherrypy.engine.publish('websocket-broadcast', m)
@@ -97,10 +102,13 @@ class Root(object):
         return """<html>
     <head>
       <script type='application/javascript' src='https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js'></script>
+      <script type='application/javascript' src='js/cbuffer.js'></script>
       <script type='application/javascript'>
         $(document).ready(function() {
 
-          websocket = '%(scheme)s://%(host)s:%(port)s/ws';
+          // websocket = '%(scheme)s://%(host)s:%(port)s/ws';
+          websocket = '%(scheme)s://' + window.location.host + '/ws';
+          console.log(window.location);
           if (window.WebSocket) {
             ws = new WebSocket(websocket);
           }
@@ -112,43 +120,74 @@ class Root(object):
             return;
           }
 
+          var Packet = function (src, dst, size, time) {
+            this.src = src;
+            this.dst = dst;
+            this.size = size;
+            this.time = time;
+          }
+          var pcbuffs = CBuffer(10);
+
           window.onbeforeunload = function(e) {
-            $('#chat').val($('#chat').val() + 'Bye bye...\\n');
-            ws.close(1000, '%(username)s left the room');
+            ws.close(1000, 'wstund monitor leave');
 
             if(!e) e = window.event;
             e.stopPropagation();
             e.preventDefault();
           };
           ws.onmessage = function (evt) {
-             $('#chat').val($('#chat').val() + evt.data + '\\n');
+             // console.log("ws.onmessage packet size " + evt.data.size);
+             var reader = new FileReader();
+             reader.onload = function(event) {
+                arrayBufferNew = this.result;
+                pdata  = new Uint8Array(this.result);
+                // console.log("data length " + pdata.length);
+                /* for (i = 0; i < pdata.length; i++) {
+                    console.log("data[ " + i + "] " + pdata[i]);
+                } */
+
+                src_ip = pdata[12] + '.' + pdata[13] + '.' + pdata[14] + '.' + pdata[15];
+                dst_ip = pdata[16] + '.' + pdata[17] + '.' + pdata[18] + '.' + pdata[19];
+                // console.log("src " + src_ip + " dst " + dst_ip);
+                pcbuffs.push(new Packet(src_ip, dst_ip, pdata.length, Date.now()));
+                // console.log("pcbuffs last " + pcbuffs.last().time);
+
+                $('#pcbs').empty();
+                for (i = 0; i < pcbuffs.length; i++) {
+                    var p = pcbuffs.get(i);
+                    if (p == undefined)
+                        break;
+                    var d = new Date(p.time);
+                    var appstr = "<tr><td>" + p.src + "</td><td>";
+                    appstr += p.dst + "</td><td>" + p.size + "</td><td>";
+                    appstr += d + "</td></tr>";
+                    $('#pcbs').append(appstr);
+                }
+             }
+             reader.readAsArrayBuffer(evt.data)
           };
           ws.onopen = function() {
-             ws.send("%(username)s entered the room");
+             // ws.send("%(username)s entered the room");
+             console.log("ws.onopen could send messages");
+             $('#status').text("wstund status: CONNECTED");
           };
           ws.onclose = function(evt) {
-             $('#chat').val($('#chat').val() + 'Connection closed by server: ' + evt.code + ' \"' + evt.reason + '\"\\n');
+             $('#status').text("wstund status: DISCONNECTED");
           };
-
-          $('#send').click(function() {
-             console.log($('#message').val());
-             ws.send('%(username)s: ' + $('#message').val());
-             $('#message').val("");
-             return false;
-          });
         });
       </script>
     </head>
     <body>
-    <form action='#' id='chatform' method='get'>
-      <textarea id='chat' cols='35' rows='10'></textarea>
-      <br />
-      <label for='message'>%(username)s: </label><input type='text' id='message' />
-      <input id='send' type='submit' value='Send' />
-      </form>
+    <h2>wstund monitor (%(scheme)s://%(host)s:%(port)s)</h2>
+    <h3 id='status'>wstund status: </h3>
+    <table>
+    <thead><tr><th>src</th><th>dst</th><th>len</th><th>time</th></tr></thead>
+    <tbody id='pcbs'>
+    </tbody>
+    </table>
     </body>
     </html>
-    """ % {'username': "User%d" % random.randint(0, 100), 'host': self.host, 'port': self.port, 'scheme': self.scheme}
+    """ % {'username': "wstund", 'host': self.host, 'port': self.port, 'scheme': self.scheme}
 
     @cherrypy.expose
     def ws(self):
@@ -167,8 +206,8 @@ class wstundServertApp():
             self.stdin_path = '/dev/null'
             self.stdout_path = '/dev/null'
             self.stderr_path = '/dev/null'
-        self.pidfile_path = '/run/wstund.pid'
-        self.pidfile_timeout = 5
+        self.pidfile_path = g.config.get('wstund', 'pidpath')
+        self.pidfile_timeout = int(g.config.get('wstund', 'pidtimeout'))
         self.host = g.config.get('server', 'host')
         self.port = int(g.config.get('server', 'port'))
         # self.ip = g.config.get('server', 'ip')
@@ -188,6 +227,10 @@ class wstundServertApp():
             '/ws': {
                 'tools.websocket.on': True,
                 'tools.websocket.handler_cls': TunWebSocketHandler
+            },
+            '/js': {
+                'tools.staticdir.on': True,
+                'tools.staticdir.dir': 'js'
             }
         })
 
@@ -199,7 +242,11 @@ def main():
 
     # g.logger.debug('YMK in wstund_client main')
 
-    daemon_runner = runner.DaemonRunner(wstundServertApp())
-    daemon_runner.do_action()
+    daemon_runner = DaemonRunner(wstundServertApp())
+    try:
+        daemon_runner.do_action()
+    except (DaemonRunnerStopFailureError, LockTimeout) as e:
+        g.logger.error(e)
+        sys.exit(e)
 
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai

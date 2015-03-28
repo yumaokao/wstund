@@ -22,14 +22,21 @@ def load_default_config():
     g.config.set('wstund', 'logfile', '/var/log/wstund.log')
     g.config.set('wstund', 'loglevel', 'INFO')
     g.config.set('wstund', 'tundev', '/dev/net/tun')
+    g.config.set('wstund', 'pidpath', '/run/wstund.pid')
+    g.config.set('wstund', 'pidtimeout', '5')
     g.config.set('client', 'host', 'wstund.your.domain')
     g.config.set('client', 'port', '80')
     g.config.set('client', 'ip', '10.10.0.4')
     g.config.set('client', 'netmask', '255.255.255.0')
+    g.config.set('client', 'mtu', '1450')
+    g.config.set('client', 'reconnect.interval', '5')
+    g.config.set('client', 'script.up', None)
+    g.config.set('client', 'script.down', None)
     g.config.set('server', 'host', '0.0.0.0')
     g.config.set('server', 'port', '5000')
     g.config.set('server', 'ip', '10.10.0.1')
     g.config.set('server', 'netmask', '255.255.255.0')
+    g.config.set('server', 'mtu', '1450')
 
 
 def load_config(args=None):
@@ -65,10 +72,10 @@ def main():
     g.logger.debug('YMK args.config [{0}]'.format(args.config))
     g.logger.debug('YMK config role [{0}]'.format(g.config.get('wstund', 'role')))
     if g.config.get('wstund', 'role') == 'client':
-        g.logger.debug('YMK call client.main')
+        # g.logger.debug('YMK call client.main')
         wstund_client.main()
     else:
-        g.logger.debug('YMK call server.main')
+        # g.logger.debug('YMK call server.main')
         wstund_server.main()
 
 
